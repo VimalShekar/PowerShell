@@ -1,3 +1,21 @@
+<#
+.Synopsis
+	Script to check if a given local or domain username and password are valid.
+
+.DESCRIPTION
+    Script to check if a given local or domain username and password are valid.
+    This script makes use of LogonUser Win32 API ad hence doesnt have any .NET dependency.
+
+.EXAMPLE
+    Check if the given local username and password is valid.
+    IsLocalUserNamePasswordValid -UserName TestLocalUser1 -Password Test@Pass1
+
+    
+.EXAMPLE
+	Check if the given domain username and password is valid.
+    IsDomainUserNamePasswordValid -UserName TestDomUser1 -Password Test@Pass1 -DomainName testdom.local
+#>
+
 . .\FileLogging.ps1
 
 
@@ -39,7 +57,6 @@ $AdvApi32 = Add-Type -MemberDefinition $logonUserSignature -Name "AdvApi32" -Nam
 $Kernel32 = Add-Type -MemberDefinition $closeHandleSignature -Name "Kernel32" -Namespace "PsInvoke.NativeMethods" -PassThru
 $AdvApi32_2  = Add-Type -MemberDefinition $revertToSelfSignature -Name "AdvApi32_2" -Namespace "PsInvoke.NativeMethods" -PassThru
 [Reflection.Assembly]::LoadWithPartialName("System.Security")
-$LogFilePath = "CheckIsUserValid.txt"
 
 
 
@@ -102,3 +119,8 @@ function IsDomainUserNamePasswordValid()
 }
 
 
+#Set-LoggerAttribs -LogFilePath (".\mylog" + "$(get-date -Format 'hhmm_dd_mm_yyyy')" + ".txt")
+#Write-LogFileEntry "testing if local username and password is valid"
+#IsLocalUserNamePasswordValid -UserName TestLocalUser1 -Password Test@Pass1
+#Write-LogFileEntry "testing if local username and password is valid"
+#IsDomainUserNamePasswordValid -UserName TestDomUser1 -Password Test@Pass1 -DomainName testdom.local

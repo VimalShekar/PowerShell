@@ -1,4 +1,4 @@
-# dot source the file to be included here.
+# dot source the file to be included here. Note that you have to execute the test scripts from the tests folder for this to work
 . ..\FileLogging.ps1
 
 Set-LoggerAttribs -LogFilePath ".\mylog.txt"

@@ -2,6 +2,9 @@
 # Note that you have to execute the test scripts from the tests folder for this to work
 . ..\CheckIsUserValid.ps1
 
+#or if machine has .NET 3.5 or greater, use the newer version
+# . ..\CheckIsUserValid_1.ps1  1
+
 Set-LoggerAttribs -LogFilePath (".\mylog" + "$(get-date -Format 'hhmm_dd_mm_yyyy')" + ".txt")
 Write-LogFileEntry "testing if local username and password is valid"
 IsLocalUserNamePasswordValid -UserName TestLocalUser1 -Password Test@Pass1
