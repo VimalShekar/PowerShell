@@ -7,10 +7,44 @@
     Script to read stored credentials from credential manager
     Makes use of CredEnum API
     Author : vimalsh@live.com
+
+.EXAMPLE
+    Get usernames and passwords from Web Credentials section of credential manager
+    Get-PasswordVaultCredentials
+
+.EXAMPLE
+    Get usernames and passwords from Windows Credentials section of credential manager
+    Get-CredManCreds
 #>
 
 . .\FileLogging.ps1
 
+
+function Get-PasswordVaultCredentials {
+    $CRED_MANAGER_CREDS_LST = @()
+
+    try
+    {
+        #Load the WinRT projection for the PasswordVault
+        $Script:vaultType = [Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]
+        $Script:vault =  new-object Windows.Security.Credentials.PasswordVault -ErrorAction silentlycontinue
+        $Results = $Script:vault.RetrieveAll()
+        foreach($credentry in  $Results)
+        {
+                $credobject = $Script:vault.Retrieve( $credentry.Resource, $credentry.UserName )
+                $obj = New-Object PSObject                
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Username" -value "$($credobject.UserName)"                  
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Hostname" -value "$($credobject.Resource)" # URI need to be sanitised
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Password" -value "$($credobject.Password)" 
+                $CRED_MANAGER_CREDS_LST += $obj                
+        }
+    }
+    catch
+    {
+        Write-LogFileEntry "Failed to instantiate passwordvault class. $($_.InvocationInfo.PositionMessage)"
+    }
+    return $CRED_MANAGER_CREDS_LST
+}
 
 #
 # Function to compile C Sharp code into an assembly
@@ -52,8 +86,14 @@ function Compile-Csharp ()
 
 
 
-# Defining some functions and assemblies that we will use later
-$CredEnumWrapperClass = @'
+
+
+Function Get-CredManCreds()
+{
+
+# Defining C# code to enum credman creds
+$CredEnumWrapperClass = 
+@'
 using System;
 using System.Runtime.InteropServices;
 
@@ -245,46 +285,100 @@ namespace CredEnum {
 } //-- end of namespace CredEnum 
 '@
 
-
-
-#
-# Funtion to read credentials stored in the credential manager and return them as an array of PSObjects
-#
-Function Get-CredManStoredCredentials()
-{
     $CRED_MANAGER_CREDS_LST = @()
-    $clCredEnumerator = $null
+
     try {
         # Attempt to create an instance of this class
-        Write-LogFileEntry "Get-CredManStoredCredentials: Attempt to create instance of CredEnum.CredEnumerator class."
-        $clCredEnumerator = [CredEnum.CredEnumerator]
+        Compile-CSharp $CredEnumWrapperClass            
     }
     catch {
-        Write-LogFileEntry "Get-CredManStoredCredentials: Could not create instance of CredEnum.CredEnumerator class."
+        Write-LogFileEntry "Error during compilation. $error " | Out-Null
         $error.clear()
+        return $CRED_MANAGER_CREDS_LST
     }
 
-    if($clCredEnumerator -eq $null)
+    $Results = [CredEnum.CredEnumerator]::CredEnumApi("")
+    foreach ($credentry in $Results) 
     {
-        try
-        {
-            Compile-CSharp $CredEnumWrapperClass
-            $Results = [CredEnum.CredEnumerator]::CredEnumerate("")
-            foreach($credentry in $Results)
-            {
-                $obj = New-Object PSObject                
-                Add-Member -inputObject $obj -memberType NoteProperty -name "Username" -value "$($credentry.UserName)" 
-                Add-Member -inputObject $obj -memberType NoteProperty -name "Hostname" -value "$($credentry.TargetName)" # need to be sanitised
-                Add-Member -inputObject $obj -memberType NoteProperty -name "Service" -value "$($credentry.Type)"
+        $HostName = $credentry.TargetName
+        $HostName = $HostName.ToLower()
+        $ServiceName = $credentry.Type
+        $UserName = $credentry.UserName
+        $DomainName = ""
+        $includethis = $True
 
-                $CRED_MANAGER_CREDS_LST += $obj
+        try 
+        {
+            if ($HostName -match "termsrv/") {                  
+                $HostName = $HostName.Substring($HostName.IndexOf("termsrv/"))                  
+                $ServiceName = "RDP"    
+                $includethis = $True       
+            }
+            elseif ( ($HostName -match "http://(.*)") -or ($HostName -match "https://(.*)")) {
+                $HostName = $matches[1] 
+                $ServiceName = "HTTP"      
+                $includethis = $True            
+            }
+            elseif ($HostName -match "ftp://(.*)") {
+                $HostName = $matches[1] 
+                $ServiceName = "FTP"    
+                $includethis = $True       
+            }
+            elseif ( ($HostName -match "domain:target=(.*)") ) #-or ($HostName -match "legacygeneric:target=(.*)")) {
+            {    
+                $HostName = $matches[1]   
+                $ServiceName = "SMB"       
+                $includethis = $True           
+            }
+            elseif ( ($HostName -match "microsoftoffice(.*)") ) #-or ($HostName -match "legacygeneric:target=(.*)")) {
+            {
+                $ServiceName = "Outlook"                     
+                $includethis = $True           
+            }
+            else {
+                $HostName = $credentry.TargetName
+                $ServiceName = $($credentry.Type)
+                $includethis = $true
+            }
+
+            if ($credentry.UserName -match "@(.*)") {
+                $DomainName = $matches[1]
+                $UserName = $UserName.Substring(0, $UserName.IndexOf("@"))
+            }
+            elseif ($credentry.UserName -match "\\(.*)") {
+                $DomainName = $UserName.Substring(0, $UserName.IndexOf("\\"))
+                $UserName = $matches[1]
+            }
+            else {
+                $UserName = $($credentry.UserName)
+                $DomainName = ""
+            }
+
+            if ($credentry.CredentialBlob -match "^.{1,20}$") {
+                $Password = $credentry.CredentialBlob
+            }
+            else { 
+                $Password = ""
+            }
+
+            if (($includethis -eq $true) -and (![string]::IsNullOrEmpty($UserName))) {
+                $obj = New-Object PSObject                
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Username" -value "$($credentry.UserName)"
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Domain" -value "$DomainName"
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Hostname" -value "$HostName" # need to be sanitised
+                Add-Member -inputObject $obj -memberType NoteProperty -name "Password" -value "$Password"
+                $CRED_MANAGER_CREDS_LST += $obj 
             }
         }
-        Catch
-        {
-            Write-LogFileEntry "Error while importing C# Library, something is wrong. $($_.InvocationInfo.PositionMessage)" -IncludeErrorVar | Out-Null
-        }       
+        catch {
+            Write-LogFileEntry "Unexpected Exception!"
+        }                   
+
     }
 
     return $CRED_MANAGER_CREDS_LST
-}
+} 
+    
+#Sample Usage:
+#Get-PasswordVaultCredentials
+#Get-CredManCreds
