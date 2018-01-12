@@ -6,6 +6,8 @@
     Script to check if a given local or domain username and password are valid.
     This script makes use of LogonUser Win32 API ad hence doesnt have any .NET dependency.
 
+	Author : vimalsh@live.com
+
 .EXAMPLE
     Check if the given local username and password is valid.
     IsLocalUserNamePasswordValid -UserName TestLocalUser1 -Password Test@Pass1

@@ -1,3 +1,12 @@
+<#
+.Synopsis
+    fuctions to check if 2.0 and 3.5 version of .NET framework is present
+    
+.DESCRIPTION
+    Fuctions to check if 2.0 and 3.5 version of .NET framework is present
+    Author : vimalsh@live.com
+    
+#>
 . .\FileLogging.ps1
 
 Function IsDotNet35orGreater {   
