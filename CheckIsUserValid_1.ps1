@@ -6,6 +6,8 @@
     Script to check if a given local or domain username and password are valid.
     This script makes use of System.DirectoryServices.AccountManagement.PrincipalContext class.
     This requires a minimum of .Net 3.5
+   
+    Author : vimalsh@live.com
 
 .EXAMPLE
     Check if the given local username and password is valid.

@@ -1,12 +1,15 @@
 <#
-Author : vimalsh@live.com
-Description : 
-This script contains logging functions. These are often used by my other scripts.
+.Synopsis
+    Logging functions
+
+.DESCRIPTION
+    This script contains logging functions. These are often used by my other scripts.
+    Author : vimalsh@live.com
 #>
 
 $global:gFLScriptDir = [System.IO.Path]::GetDirectoryName($myInvocation.MyCommand.Definition)
 $global:gLogFilePath = "$global:gFLScriptDir\$($myInvocation.MyCommand)" + "$(get-date -Format 'hhmm_dd_mm_yyyy')" + ".txt"
-
+$global:gPrintToScreen = $false
 
 #
 #   Function to set the Global attributes of the Logger such as LogFilePath
@@ -17,11 +20,16 @@ function Set-LoggerAttribs {
     [string] $LogFilePath = $global:gLogFilePath,
 
     # The directory in which the script is executing
-    [string] $ScriptDirectory = $global:gFLScriptDir
+    [string] $ScriptDirectory = $global:gFLScriptDir,
+
+    #Specifies whether to print the logs to the screen
+    [switch] $PrintToScreen = $off
     )
 
     $global:gLogFilePath = $LogFilePath
     $global:gFLScriptDir = $ScriptDirectory
+    $global:gPrintToScreen = $PrintToScreen
+
 }
 
 
@@ -57,7 +65,7 @@ function Write-LogFileEntry {
     try{
         $LogMessage = "$(get-date -Format 'dd/MM/yyyy-hh:mm:ss')::$Level::$($Message)" 
         
-        if($DoNotPrintToScreen)
+        if($DoNotPrintToScreen -or ($global:gPrintToScreen -eq $false) )
         {
             #then dont write to screen, just write to the log file
             $LogMessage | Out-File $global:gLogFilePath -Append
