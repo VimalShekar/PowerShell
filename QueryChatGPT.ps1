@@ -1,38 +1,50 @@
-function Query-ChatGPT {
+function Get-OpenAIAvailableModels {
+  param(
+  # API key
+  [string] $ApiKey
+  )  
+   # Set the headers with your API key
+  $headers = @{
+    "Authorization" = "Bearer $ApiKey"
+    "Content-Type" = "application/json"
+  }
+  
+  $obj = Invoke-RestMethod -Uri https://api.openai.com/v1/models -Method Get -Headers $headers
+  return $obj.data
+}
+
+function Query-OpenAIPromptResponse {
 
 param(
-  # the query to be sent to chatGPT
-  [string] $Query, 
+  # the query to be sent to chatGPT/model
+  [string] $Prompt, 
   
   # API key
   [string] $ApiKey,
   
   # Model that you want to select
-  [string] $Model = "chatGPT",
+  # See https://platform.openai.com/docs/models/gpt-3
+  [string] $Model = "text-davinci-003",
   
   # Temperature to be passed to the mode.ll
   $Temperature = 0.9 
-  )
-
- 
+  ) 
 
   # Set the headers with your API key
   $headers = @{
-    "Authorization" = $ApiKey
+    "Authorization" = "Bearer $ApiKey"
     "Content-Type" = "application/json"
   }
   
   # Set the body with your query and other options
   $body = @{
     "model" = $Model
-    "query" = $Query
+    "prompt" = $Prompt
     "temperature" = $Temperature 
-    "frequency_penalty" = 0.5 # Penalizes new tokens based on frequency
-    "presence_penalty" = 0.6 # Penalizes new tokens based on presence
     "stop" = "\n\n" # Stops generating when reaching this token
   } | ConvertTo-Json
 
   # Invoke the REST method with POST method and return response
-  Invoke-RestMethod -Uri https://api.openai.com/v1/engines/chatgpt/completions -Method Post -Headers $headers -Body $body
-
+  $obj = Invoke-RestMethod -Uri https://api.openai.com/v1/completions -Method Post -Headers $headers -Body $body
+  return $obj.choices.text
 }
